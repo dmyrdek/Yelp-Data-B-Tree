@@ -1,6 +1,20 @@
 import com.google.gson.annotations.SerializedName;
 
-public class Business {
+public class Business implements Comparable<Business> {
+
+    @Override
+    public int hashCode(){
+        return Math.abs(this.business_id.hashCode()/10);
+    }
+
+    public String getStringHashCode(){
+        return Integer.toString(this.hashCode());
+    }
+
+    public int compareTo(Business b){
+        return this.getStringHashCode().compareTo(b.getStringHashCode());
+    }
+
     @SerializedName("business_id")
     private String business_id;
 
@@ -138,4 +152,15 @@ public class Business {
         is_open = tempIs_open;
     }*/
 
+    public Business(String business_id, String name, String address, String city, String state, String postal_code, double latitude, double longitude, String[] categories) {
+        this.business_id = business_id;
+        this.name = name;
+        this.address = address;
+        this.city = city;
+        this.state = state;
+        this.postal_code = postal_code;
+        this.latitude = latitude;
+        this.longitude = longitude;
+        this.categories = categories;
+    }
 }
