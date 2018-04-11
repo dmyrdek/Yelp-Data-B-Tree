@@ -12,7 +12,7 @@ public class Business implements Comparable<Business> {
     }
 
     public int compareTo(Business b){
-        return this.getStringHashCode().compareTo(b.getStringHashCode());
+        return this.getBusiness_id().compareTo(b.getBusiness_id());
     }
 
     @SerializedName("business_id")
@@ -162,5 +162,9 @@ public class Business implements Comparable<Business> {
         this.latitude = latitude;
         this.longitude = longitude;
         this.categories = categories;
+    }
+
+    public String toString(){
+        return this.getName() + " " + this.getBusiness_id();
     }
 }
