@@ -1,32 +1,29 @@
-import com.sun.tools.doclets.formats.html.SourceToHTMLConverter;
-import com.sun.xml.internal.ws.policy.privateutil.PolicyUtils;
-
 import java.io.IOException;
 import java.io.RandomAccessFile;
 import java.io.Serializable;
 import java.nio.ByteBuffer;
 import java.nio.channels.FileChannel;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.List;
 import java.util.Scanner;
 
 public class BTree implements Serializable {
+    final static int NODESIZE = 4096;
+
+
     public static class Node implements Serializable{
-        private Integer keys;
-        private Integer childCount;
+        private int keyCount;
+        private int childCount;
         private Business[] businesses;
         private Node[] children;
         private boolean isLeaf;
         private long id;
 
 
-
-
         public Node(boolean l, long i){
             businesses = new Business[2 * minDegree - 1];
             children = new Node[2 * minDegree];
-            keys = 0;
+            keyCount = 0;
             childCount = 0;
             isLeaf = l;
             id = i;
@@ -45,8 +42,8 @@ public class BTree implements Serializable {
             return businesses;
         }
 
-        public int getKeys() {
-            return keys;
+        public int getKeyCount() {
+            return keyCount;
         }
 
         public boolean isLeaf() {
@@ -61,14 +58,11 @@ public class BTree implements Serializable {
             return children;
         }
 
-        private void sortBusinesses(){
-            Arrays.sort(businesses,0,keys);
-        }
+
 
         public void insertBusiness(Business b){
-            businesses[keys] = b;
-            keys++;
-            sortBusinesses();
+            businesses[keyCount] = b;
+            keyCount++;
         }
 
         public void removeChild(int i){
@@ -78,7 +72,7 @@ public class BTree implements Serializable {
 
         public void removeBusiness(int i){
             businesses[i] = null;
-            keys--;
+            keyCount--;
         }
 
         public int middleKey(){
@@ -86,30 +80,26 @@ public class BTree implements Serializable {
         }
 
         public boolean isFull(){
-            return keys == ((2*minDegree)-1);
+            return keyCount == ((2*minDegree)-1);
         }
 
 
     }
 
     Node root;
-    private static int minDegree;
+    final static int minDegree = 16;
     private int height;
-    private Business searchResult = null;
+    //private Business searchResult = null;
     private int total;
-    ArrayList<Business> allBusinesses = new ArrayList<>();
+   // ArrayList<Business> allBusinesses = new ArrayList<>();
 
-    public Business getSearchResult() {
-        return searchResult;
-    }
 
     //private ArrayList<Business> businesses;
 
     public BTree() {
-        minDegree = 16;
         total = 0;
         Node temp = new Node(true, total);
-        temp.keys=0;
+        temp.keyCount =0;
         temp.childCount=0;
         root = temp;
 
@@ -125,9 +115,9 @@ public class BTree implements Serializable {
 
 
 
-    public ArrayList<Business> traverse(Node n){
+    /*public ArrayList<Business> traverse(Node n){
         int i;
-        for (i = 0; i < n.keys; i++){
+        for (i = 0; i < n.keyCount; i++){
             if (!n.isLeaf){
                 traverse(n.getChildren()[i]);
             }
@@ -135,103 +125,162 @@ public class BTree implements Serializable {
             allBusinesses.add(b);
             //businesses.add(b);
         }
+        //last child
         if (!n.isLeaf){
             traverse(n.getChildren()[i]);
         }
         return allBusinesses;
-    }
+    }*/
 
-    public void insert(Business b){
-        if (root == null){
-            root = new Node(true,total);
-            root.insertBusiness(b);
-            height++;
-        } else {
-            if (root.isFull()){
-                System.out.println("inserted when root is full");
-                Node x = new Node(false,total);
-                x.insertChildren(root);
-                root = x;
-                split(x, 0);
-                insertNonFull(x,b);
-                height++;
-            } else{
-                System.out.println("inserted");
-                insertNonFull(root, b);
+    /*public ArrayList<Business> traverseFromLoadedRoot(Node n) throws IOException{
+        for (int i = 0; i < n.keyCount; i++){
+            Node nextToLook=null;
+            if (n.childCount != 0){
+                nextToLook = n.getChildren()[i];
+            }
+
+            if (nextToLook != null) {
+                if (!n.isLeaf && n.id != nextToLook.id) {
+                    traverseFromLoadedRoot(this.ReadNode(nextToLook.id));
+                }
+                Business b = n.businesses[i];
+                allBusinesses.add(b);
             }
         }
+
+        return allBusinesses;
+    }
+*/
+
+    public void insert(Business b) throws Exception{
+        Node r = root;
+       if (root.keyCount == 2 * minDegree -1) {
+           total++;
+           Node s = new Node (false, total);
+           root = s;
+           s.keyCount = 0;
+           s.children[0] = r;
+           s.childCount++;
+           split(s,r);
+           insertNonFull(s,b);
+       } else {
+           insertNonFull(r, b);
+       }
     }
 
     public void insertNonFull(Node x, Business b){
-        int i = x.getKeys() - 1;
+        int i = x.getKeyCount() - 1;
 
-        if (x.isLeaf()){
-            x.insertBusiness(b);
-        } else {
-            while (i > 0 && b.compareTo(x.getBusinesses()[i - 1]) < 0) {
-                i -= 1;
+        if (x.isLeaf) {
+            while (i > -1 && b.hashCode() < x.businesses[i].hashCode()) {
+                x.businesses[i + 1] = x.businesses[i];
+                i--;
             }
-            i += 1;
+
+            i++;
+            x.businesses[i] = b;
+            x.keyCount++;
+            //write(x);
+        } else {
+            while (i > -1 && b.hashCode() < x.businesses[i].hashCode()) { //find appropriate spot
+                i--;
+            }
+
+            i++;
+            Node temp = x.children[i];
 
             if (x.getChildren()[i].isFull()) {
-                split(x, i);
-                if (b.compareTo(x.getBusinesses()[i]) > 0) {
-                    i += 1;
+                split(x, x.getChildren()[i]);
+                if (b.hashCode() > x.businesses[i].hashCode()) {
+                    i++;
                 }
             }
-            insertNonFull(x.getChildren()[i], b);
+            insertNonFull(temp, b);
         }
     }
 
-    public void split(Node parent, int i) {
+    public void split(Node x, Node y) {
         total++;
-        Node left = parent.getChildren()[i];
-        Node right = new Node(left.isLeaf(),total);
-        int median = left.middleKey();
-
-        parent.insertBusiness(left.getBusinesses()[median]);
-
-        for (int j = 1; j <= median; j++) {
-            right.insertBusiness(left.getBusinesses()[j + median]);
+        Node z = new Node(y.isLeaf,total);
+        z.isLeaf= y.isLeaf;
+        for (int i = 0; i < minDegree - 1; i++) { //move second half of y's keyCount to to first half of z's keyCount
+            z.businesses[i] = y.businesses[i + minDegree];
+            z.keyCount++; //just added a key, increment numKeys
+            y.businesses[i + minDegree] = null; ///this line might give some weird errors - for just keyCount it was y.keyCount[i + K] = 0
+            y.keyCount--;
         }
 
-        for (int j = left.getKeys() - 1; j >= median; j--) {
-            left.removeBusiness(j);
-        }
-
-        if (!left.isLeaf()) {
-            for (int j = 1; j <= median + 1; j++) {
-                right.insertChildren(left.getChildren()[j + median]);
-            }
-
-            for (int j = left.getChildCount() - 1; j >= median + 1; j--) {
-                left.removeChild(j);
+        if (!y.isLeaf) {
+            //move second half of y's pointers to be first half of z's pointers
+            for (int i = 0; i < minDegree; i++) {
+                z.children[i] = y.children[i + minDegree];
+                z.childCount++;
+                y.children[i + minDegree] = null;
+                y.childCount--;
             }
         }
 
-        parent.insertChildren(right);
+        // Z node can never point at 0
+        int index = x.keyCount - 1;
+        while (index > -1 && y.businesses[minDegree - 1].hashCode() < x.businesses[index].hashCode()) {
+            x.businesses[index + 1] = x.businesses[index];
+            index--;
+        }
+
+        index++;
+        x.businesses[index] = y.businesses[minDegree - 1];
+        x.keyCount++;
+        y.businesses[minDegree - 1] = null; /// might give an error also -- used to be y.keyCount[K - 1] = 0
+        y.keyCount--;
+
+
+        int index2 = x.childCount - 1;
+        while (index2 > index) {
+            x.children[index2 + 1] = x.children[index2];
+            index2--;
+        }
+
+        index2++;
+        x.children[index2] = z;
+        x.childCount++;
+
+        //write(x);
+        //write(y);
+        //write(z);
+
     }
 
 
 
 
 
-    public void search(Node n, Business b) throws IOException {
+    public Business search(Node n, Business b) throws IOException {
         int i = 0;
 
-        while (i < n.getKeys() && b.compareTo(n.getBusinesses()[i]) > 0) {
+        while (i < n.getKeyCount() && b.hashCode() > n.getBusinesses()[i].hashCode()) {
             i += 1;
         }
-        if (i < n.getKeys() && b.compareTo(n.getBusinesses()[i]) == 0) {
-            searchResult = n.businesses[i];
-        } else if (!n.isLeaf()){
-            search(n.getChildren()[i], b);
+        if (i <= n.getKeyCount() && b.hashCode() == n.getBusinesses()[i].hashCode()) {
+            return n.businesses[i];
+        } else if (n.isLeaf()){
+            return null;
+        } else {
+            if (b.hashCode() < n.getBusinesses()[i].hashCode()) {
+                if (n.children[i].id != 0){
+                    return search(this.ReadNode(n.getChildren()[i].id), b);
+                } else {
+                    return null;
+                }
+            } else {
+                return search(this.ReadNode(n.getChildren()[i+1].id), b);
+
+            }
         }
     }
 
-    public void search(Node n, String k){
+    /*public void search(Node n, String k){
         int i;
-        for (i = 0; i < n.keys; i++){
+        for (i = 0; i < n.keyCount; i++){
             System.out.println(n.id);
             if (!n.isLeaf){
                 search(n.getChildren()[i],k);
@@ -245,7 +294,7 @@ public class BTree implements Serializable {
         if (!n.isLeaf){
             search(n.getChildren()[i],k);
         }
-    }
+    }*/
 
     public void showRoot() {
         for (Business b : root.getBusinesses()) {
@@ -258,11 +307,11 @@ public class BTree implements Serializable {
 
     void writeAllNodes(Node n) throws IOException{
         int i;
-        for (i = 0; i < n.keys; i++){
+        for (i = 0; i < n.keyCount; i++){
             if (!n.isLeaf){
                 writeAllNodes(n.getChildren()[i]);
             }
-            System.out.println("writing node with id: " + n.id);
+            System.out.println("writing node with id: " + n.id + " ");
             WriteNode(n);
         }
         if (!n.isLeaf){
@@ -272,12 +321,9 @@ public class BTree implements Serializable {
 
     public void  WriteNode(Node n) throws IOException{
         RandomAccessFile file = new RandomAccessFile("Nodes", "rw");
-        file.seek(n.id * 4096);
+        file.seek(n.id * NODESIZE);
         FileChannel fc = file.getChannel();
-        ByteBuffer bb = ByteBuffer.allocate(4096);
-
-        bb.putInt(this.height);
-        bb.putInt(this.total);
+        ByteBuffer bb = ByteBuffer.allocate(NODESIZE);
 
         int leaf;
         if (this.root.isLeaf){
@@ -287,12 +333,16 @@ public class BTree implements Serializable {
         }
 
         bb.putInt(leaf);
-        bb.putLong(this.root.getId());
 
-        bb.putInt(this.root.getKeys());
-        for (int i=0; i<this.root.getKeys(); i++){
+        if (n.getId() > 9000){
+            System.out.println();
+        }
+        bb.putLong(n.getId());
 
-            Business current = this.root.businesses[i];
+        bb.putInt(n.getKeyCount());
+        for (int i = 0; i<n.getKeyCount(); i++){
+
+            Business current = n.businesses[i];
 
             byte [] name = current.getName().getBytes();
             bb.putInt(name.length);
@@ -310,9 +360,12 @@ public class BTree implements Serializable {
             bb.putDouble(current.getLongitude());
         }
         // put the id's of the child nodes so that we can use that id as a multiplier throughout the file
-        bb.putInt(this.root.childCount);
-        for (int j = 0; j<this.root.childCount; j++){
-            bb.putLong(this.root.children[j].id);
+        bb.putInt(n.childCount);
+        for (int j = 0; j<n.childCount; j++){
+            if (n.children[j].getId() > 9000){
+                System.out.println();
+            }
+            bb.putLong(n.children[j].getId());
         }
         bb.flip();
         fc.write(bb);
@@ -324,9 +377,13 @@ public class BTree implements Serializable {
     public Node ReadNode(Long id) throws  IOException{
         Node temp = new Node (false, 0); // make random node
         RandomAccessFile file = new RandomAccessFile("Nodes", "rw");
-        file.seek(4096 * id);
+        if (NODESIZE* id < 0) {
+            System.out.println("fuck");
+        }
+
+        file.seek(NODESIZE * id);
         FileChannel fc = file.getChannel();
-        ByteBuffer bb = ByteBuffer.allocate(4096);
+        ByteBuffer bb = ByteBuffer.allocate(NODESIZE);
         fc.read(bb);
         bb.flip();
 
@@ -338,8 +395,8 @@ public class BTree implements Serializable {
         }
 
         temp.id = bb.getLong();
-        temp.keys = bb.getInt();
-        for (int i = 0; i < temp.keys; i++) {
+        temp.keyCount = bb.getInt();
+        for (int i = 0; i < temp.keyCount -1; i++) {
 
             //read name
             int nameLen = bb.getInt();
@@ -363,15 +420,20 @@ public class BTree implements Serializable {
             Double longitude = bb.getDouble();
 
             Business current = new Business(idn, name, null, city, null, null, lattitude, longitude, null);
-            temp.businesses[i] = current;
+            if(current != null) {
+                if (i < 32) {
+                    temp.businesses[i] = current;
+                }
+            }
         }
 
         temp.childCount = bb.getInt();
         for (int i = 0; i < temp.childCount; i++) {
             // This here doesnt actually get the full node, just the location of the node in the file
             Long idp = bb.getLong();
-            temp.children[i] = new Node(false, idp);
-
+            if (i < 32) {
+                temp.children[i] = new Node(false, idp);
+            }
         }
 
 
@@ -387,14 +449,12 @@ public class BTree implements Serializable {
             RandomAccessFile rf = new RandomAccessFile("Root", "rw");
             rf.seek(0);
             FileChannel fc = rf.getChannel();
-            ByteBuffer bb = ByteBuffer.allocate(4096);
+            ByteBuffer bb = ByteBuffer.allocate(NODESIZE);
             fc.read(bb);
             bb.flip();
 
             BTree bt = new BTree();
             bt.root = r;
-            bt.height = bb.getInt();
-            bt.total = bb.getInt();
 
             int leaf = bb.getInt();
             if (leaf == 1) {
@@ -404,8 +464,8 @@ public class BTree implements Serializable {
             }
 
             r.id = bb.getLong();
-            r.keys = bb.getInt();
-            for (int i = 0; i < r.keys; i++) {
+            r.keyCount = bb.getInt();
+            for (int i = 0; i < r.keyCount; i++) {
 
                 //read name
                 int nameLen = bb.getInt();
@@ -437,7 +497,6 @@ public class BTree implements Serializable {
                 // This here doesnt actually get the full node, just the location of the node in the file
                 Long id = bb.getLong();
                 r.children[i] = new Node(false, id);
-
             }
 
 
@@ -456,10 +515,7 @@ public class BTree implements Serializable {
         RandomAccessFile rf = new RandomAccessFile("Root", "rw");
         rf.seek(0);
         FileChannel fc = rf.getChannel();
-        ByteBuffer bb = ByteBuffer.allocate(4096);
-
-        bb.putInt(this.height);
-        bb.putInt(this.total);
+        ByteBuffer bb = ByteBuffer.allocate(NODESIZE);
 
         int leaf;
         if (this.root.isLeaf){
@@ -471,8 +527,8 @@ public class BTree implements Serializable {
         bb.putInt(leaf);
         bb.putLong(this.root.getId());
 
-        bb.putInt(this.root.getKeys());
-        for (int i=0; i<this.root.getKeys(); i++){
+        bb.putInt(this.root.getKeyCount());
+        for (int i = 0; i<this.root.getKeyCount(); i++){
 
             Business current = this.root.businesses[i];
 
@@ -507,19 +563,17 @@ public class BTree implements Serializable {
 
 
 
-    public static void main(String[] args) throws IOException {
-        Scanner kb = new Scanner(System.in);
-        DatabaseParser dp = new DatabaseParser();
+    public static void main(String[] args) throws IOException, Exception {
+       Scanner kb = new Scanner(System.in);
+
+
+       DatabaseParser dp = new DatabaseParser();
         List<Business> businesses = dp.businessesParser();
         BTree bt = new BTree();
         int x = 0;
         for (Business b : businesses){
             x++;
             System.out.println(x);
-
-            if (x == 31){
-                System.out.println("");
-            }
             bt.insert(b);
 
         }
@@ -527,40 +581,42 @@ public class BTree implements Serializable {
         System.out.println(bt.total);
         bt.writeRoot();
         bt.writeAllNodes(bt.root);
+        Node no = bt.ReadNode((long)1200);
+
+
+        // right now the traverseFromRoot method and readNode method always get the root for some super weird reason
+
 
         BTree bt2 = BTree.loadRoot();
-
+        Node n = bt2.ReadNode(bt2.root.children[0].id);
+        Node n2 = bt2.ReadNode(bt2.root.children[1].id);
 
 
         //bt.traverse(getRoot());
         System.out.println();
-        ArrayList <Business> allBusinesses = bt.traverse(bt.root);
         String b;
         System.out.println("Enter a business id: ");
+
         b = kb.nextLine();
         Business test = new Business(b, null,null,null,null,null,0,0,null);
-        for (Business bu : allBusinesses){
-            if (bu.getBusiness_id().equals(test.getBusiness_id())){
-                System.out.println(bu.toString());
-            }
-        }
-        bt.search(bt.getRoot(),test);
-        Business temp = bt.getSearchResult();
 
-
-        while (true) {
-            if (temp != null) {
-                System.out.println(temp.toString());
-                System.out.println("Enter a business id: ");
-                b = kb.nextLine();
-                test = new Business(b, null,null,null,null,null,0,0,null);
-                bt.search(bt.getRoot(), test.getBusiness_id());
-                temp = bt.getSearchResult();
-            } else {
-                System.out.println("not found");
-                break;
-            }
-        }
+        Business bu = bt2.search(bt2.root,test);
+        System.out.println(bu.getName());
+        System.out.println();
+//
+//        while (true) {
+//            if (temp != null) {
+//                System.out.println(temp.toString());
+//                System.out.println("Enter a business id: ");
+//                b = kb.nextLine();
+//                test = new Business(b, null,null,null,null,null,0,0,null);
+//                bt.search(bt.getRoot(), test.getBusiness_id());
+//                temp = bt.getSearchResult();
+//            } else {
+//                System.out.println("not found");
+//                break;
+//            }
+//        }
 
     }
 }
