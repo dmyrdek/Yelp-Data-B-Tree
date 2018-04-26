@@ -96,12 +96,13 @@ public class BTree implements Serializable {
 
     //private ArrayList<Business> businesses;
 
-    public BTree() {
+    public BTree() throws IOException{
         total = 0;
         Node temp = new Node(true, total);
         temp.keyCount =0;
         temp.childCount=0;
         root = temp;
+        WriteNode(temp);
 
         //also need to write the root
         //businesses = new ArrayList<>();
@@ -168,7 +169,7 @@ public class BTree implements Serializable {
        }
     }
 
-    public void insertNonFull(Node x, Business b){
+    public void insertNonFull(Node x, Business b) throws IOException{
         int i = x.getKeyCount() - 1;
 
         if (x.isLeaf) {
@@ -180,7 +181,7 @@ public class BTree implements Serializable {
             i++;
             x.businesses[i] = b;
             x.keyCount++;
-            //write(x);
+            WriteNode(x);
         } else {
             while (i > -1 && b.hashCode() < x.businesses[i].hashCode()) { //find appropriate spot
                 i--;
@@ -199,7 +200,7 @@ public class BTree implements Serializable {
         }
     }
 
-    public void split(Node x, Node y) {
+    public void split(Node x, Node y) throws IOException {
         total++;
         Node z = new Node(y.isLeaf,total);
         z.isLeaf= y.isLeaf;
@@ -244,10 +245,10 @@ public class BTree implements Serializable {
         x.children[index2] = z;
         x.childCount++;
 
-        //write(x);
-        //write(y);
-        //write(z);
 
+        WriteNode(x);
+        WriteNode(y);
+        WriteNode(z);
     }
 
 
@@ -396,8 +397,8 @@ public class BTree implements Serializable {
 
         temp.id = bb.getLong();
         temp.keyCount = bb.getInt();
-        for (int i = 0; i < temp.keyCount -1; i++) {
-
+        for (int i = 0; i < temp.keyCount; i++) {
+//        for (int i = 0; i < temp.keyCount -1; i++) {
             //read name
             int nameLen = bb.getInt();
             byte[] nameBuf = new byte[nameLen];
@@ -567,7 +568,7 @@ public class BTree implements Serializable {
        Scanner kb = new Scanner(System.in);
 
 
-       DatabaseParser dp = new DatabaseParser();
+       /*DatabaseParser dp = new DatabaseParser();
         List<Business> businesses = dp.businessesParser();
         BTree bt = new BTree();
         int x = 0;
@@ -580,16 +581,16 @@ public class BTree implements Serializable {
 
         System.out.println(bt.total);
         bt.writeRoot();
-        bt.writeAllNodes(bt.root);
-        Node no = bt.ReadNode((long)1200);
+        //bt.writeAllNodes(bt.root);
+        Node no = bt.ReadNode((long)1200);*/
 
 
         // right now the traverseFromRoot method and readNode method always get the root for some super weird reason
 
 
         BTree bt2 = BTree.loadRoot();
-        Node n = bt2.ReadNode(bt2.root.children[0].id);
-        Node n2 = bt2.ReadNode(bt2.root.children[1].id);
+        /*Node n = bt2.ReadNode(bt2.root.children[0].id);
+        Node n2 = bt2.ReadNode(bt2.root.children[1].id);*/
 
 
         //bt.traverse(getRoot());
